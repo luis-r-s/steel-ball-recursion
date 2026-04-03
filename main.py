@@ -7,7 +7,25 @@ import time
 from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-path = "out/"
+path = "steel-ball-run"
+
+def make_chapter_list():
+    chapter_link = "https://www.steelballrun.org"
+    chapter_list = []
+
+    response = requests.get(chapter_link)
+
+    soup = BeautifulSoup(response.text, "html.parser")
+    n = 1
+    for tag in soup.find_all("a"):
+        try:
+            if("manga/jojos" in tag["href"] ):
+                print(tag["class"])
+                print(tag["href"])
+                chapter_list.append(tag["href"])
+        except:
+            pass
+    return chapter_list
 
 
 def download_file(filename, url, max_retries=3):
@@ -42,38 +60,40 @@ def download_file(filename, url, max_retries=3):
             return False
 
 
-def main():
-    os.makedirs(path, exist_ok=True)
-
-    url = sys.argv[1]
+def compose_chapter_pdf(url):
+    output = url[35:-1].replace("chapter-", "").title() + ".pdf"
     response = requests.get(url)
     soup = BeautifulSoup(response.text, "html.parser")
-    pictures = soup.find_all("picture")
+    # Logic to parse out the source url of the page images (which are jpeg in this scenario
+    img_urls = []
+    for tag in soup.find_all("meta"):
+        try:
+            if("og:image" in tag["property"]):
+                img_urls.append(tag["content"])
+        except:
+            pass
 
-    img_urls = [pic.img["src"] for pic in pictures]
 
     with ThreadPoolExecutor(max_workers=4) as executor:
         futures = {}
         for i, img_url in enumerate(img_urls):
-            ext = os.path.splitext(img_url)[-1] or ".png"
+            ext = os.path.splitext(img_url)[-1] or ".jpeg"
             filename = os.path.join(path, f"image_{i}{ext}")
             future = executor.submit(download_file, filename, img_url)
             futures[future] = i
             print(f"queued page {i}")
 
-        completed = 0
         for future in as_completed(futures):
             i = futures[future]
             try:
                 success = future.result()
                 if success:
                     print(f"downloaded page {i}")
-                    completed += 1
             except Exception as e:
                 print(f"error on page {i}: {e}")
 
     image_files = sorted(
-        [os.path.join(path, fn) for fn in os.listdir(path) if fn.endswith(".png")],
+        [os.path.join(path, fn) for fn in os.listdir(path) if fn.endswith(".jpeg")],
         key=lambda x: int(os.path.splitext(os.path.basename(x))[0].split("_")[1]),
     )
 
@@ -83,11 +103,19 @@ def main():
 
     print(f"converting {len(image_files)} images to pdf")
     pdf_data = img2pdf.convert(image_files)
-    with open(os.path.join(path, "output.pdf"), "wb") as f:
+    with open(os.path.join(path, output), "wb") as f:
         f.write(pdf_data)
 
-    subprocess.run("rm -f out/*.png", shell=True, check=True)
+    subprocess.run("rm -f steel-ball-run/*.jpeg", shell=True, check=True)
 
+def main():
+    os.makedirs(path, exist_ok=True)
+
+    chapter_num = 1
+    for chapter in make_chapter_list():
+        compose_chapter_pdf(chapter)
+        print( f"chapter {chapter_num} downloaded")
+        chapter_num +=1
 
 if __name__ == "__main__":
     main()
