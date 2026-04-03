@@ -1,8 +1,10 @@
-# dowloads op manga in very regarded way. pdf file can be found in out/ dir after running following run command
+# dowloads steel ball run color manga in very regarded way. pdf files
+
+They're numbered and stored in one resulting directory named steel-ball-run
 
 ```bash
 uv sync
 ```
 ```bash
-uv run main.py https://tcbonepiecechapters.com/chapters/7884/one-piece-chapter-1160 #replace url
+uv run main.py
 ```
